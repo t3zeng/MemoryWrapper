@@ -8,11 +8,19 @@ int main(void) {
     *test = 69;
     printf("Value: %d\r\n", *test);
 
-    sleep(5);
+    sleep(2);
 
     int *test2 = (int *)stats_malloc(sizeof(int));
     *test2 = 70;
     printf("Value: %d\r\n", *test2);
+
+    print_thread();
+
+    // why is this buggy
+    stats_free(test);
+
+    print_thread();
+
 
     return 0;
 }

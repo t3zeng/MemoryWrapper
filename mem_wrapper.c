@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <string.h>
+#include <math.h> 
 
 #define ALLOCATION_BUCKET_COUNT (12)
 #define ALLOCATION_BUCKET_OFFSET (2)
@@ -36,18 +37,23 @@ void stats_init(void) {
 
 // Thread to print out statistics every 5 seconds
 void print_thread(void){
-    fprintf(stderr, "Overall stats:\n");
+    fprintf(stderr, "\n\n\nOverall stats:\n");
     fprintf(stderr, "%lu Overall allocations since start\n", memstats.num_allocations);
     fprintf(stderr, "%lub Current total allocated size\n", memstats.current_allocated_size);
     fprintf(stderr, "\n");
     fprintf(stderr, "Current allocations by size:\n");
+
+    // print out allocations by bucket
     for(int i = ALLOCATION_BUCKET_OFFSET; i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET; i++) {
+        // special case the first bucket to print with '<'
         if(i == ALLOCATION_BUCKET_OFFSET) {
             fprintf(stderr, "<%d bytes: %lu\n", (1<<i), memstats.allocation_buckets[i]);
         }
+        // typical case
         else if (i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET-1){
             fprintf(stderr, "%d-%d bytes: %lu\n", (1<<(i-1)), (1<<i), memstats.allocation_buckets[i]);
         }
+        // special case the first bucket to print with '>'
         else {
             fprintf(stderr, ">%d bytes: %lu\n", (1<<(i-1)), memstats.allocation_buckets[i]);
         }
@@ -55,21 +61,81 @@ void print_thread(void){
 
     // time must be generated on the spot to be accurate
     // iterate through linked list to get the correct time buckets
+    fprintf(stderr, "\nCurrent Allocations by Age\n");
+    memset(&memstats.time_buckets, 0, sizeof(uint64_t)*TIME_BUCKET_COUNT);
     print_time = time(0);
     if(head != NULL) {
         mem_info_t *alias = head;
         // add time data to correct bucket
-        printf("time spent %f\n", difftime(print_time, alias->time_allocated) * 1000.);
+        for(int i = 0; i < TIME_BUCKET_COUNT; i++) {
+            if((int)difftime(print_time, alias->time_allocated) < pow(10,i)) {
+                memstats.time_buckets[i]++;
+                break;
+            }
+        }
         while(alias->next != NULL) {
             // move on to next mem block
             alias = alias->next;
 
             // add time data to correct bucket
-            printf("time spent %f\n", difftime(print_time, alias->time_allocated) * 1000.);
+            for(int i = 0; i < TIME_BUCKET_COUNT; i++) {
+                if((int)difftime(print_time, alias->time_allocated) < pow(10,i)) {
+                    memstats.time_buckets[i]++;
+                    break;
+                }
+            }   
+        }
+        // Print out numbers
+        for(int i = 0; i < TIME_BUCKET_COUNT; i++) {
+            fprintf(stderr, "<%d seconds: %ld\n", (int)pow(10,i), memstats.time_buckets[i]);
+        }   
+    }    
+
+     fprintf(stderr, "\n\n");
+}
+
+static void remove_mem_info(void *ptr) {
+    // Look for ptr in linked list and remove
+    if(head == NULL) {
+        // should never get here if we get passed a valid ptr
+        fprintf(stderr, "ERROR\n");
+        return;
+    }
+    mem_info_t *alias = head;
+    if(head->ptr == ptr) {
+        // update memstats 
+        memstats.num_allocations--;
+        memstats.current_allocated_size-=head->size_allocated;
+        for(int i = ALLOCATION_BUCKET_OFFSET; i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET; i++) {
+            if(head->size_allocated < (1 << i)) {
+                memstats.allocation_buckets[i]--;
+                break;
+            }
+        }
+        free(head);
+        head = NULL;
+    } else {
+        while(alias->next != NULL) {
+            // clear out memory once ptr is found
+            mem_info_t *prior = alias;
+            alias = alias->next;
+            if(alias->ptr == ptr) {
+                // update memstats 
+                memstats.num_allocations--;
+                memstats.current_allocated_size-=head->size_allocated;
+                for(int i = ALLOCATION_BUCKET_OFFSET; i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET; i++) {
+                    if(head->size_allocated < (1 << i)) {
+                        memstats.allocation_buckets[i]--;
+                        break;
+                    }
+                }
+                prior->next = alias->next;
+                free(alias);
+            }
         }
     }
     
-    // print 
+    return;
 }
 
 static void append_mem_info(void *ptr, size_t size) {
@@ -104,9 +170,6 @@ static void append_mem_info(void *ptr, size_t size) {
             break;
         }
     }
-
-    // temporary for dev
-    print_thread();
 }
 
 /* Call this instead of regular malloc for stats info
@@ -159,12 +222,6 @@ void *stats_calloc(size_t nitems, size_t size) {
 void stats_free(void *ptr) {
     printf("special free\r\n");
 
-    // remove allocation
-    // memstats.current_allocated_size-=size*nitems;
-    // for(int i = 0; i < ALLOCATION_BUCKET_COUNT; i++) {
-    //     if(size*nitems < (1 << i)) {
-    //         memstats.allocation_buckets[i]++;
-    //     }
-    // }
+    remove_mem_info(ptr);
     free(ptr);
 }
