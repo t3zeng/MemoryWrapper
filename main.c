@@ -16,7 +16,6 @@ int main(void) {
 
     print_thread();
 
-    // why is this buggy
     stats_free(test);
 
     print_thread();

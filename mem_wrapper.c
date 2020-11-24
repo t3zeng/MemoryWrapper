@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <string.h>
-#include <math.h> 
+#include <math.h>
 
 #define ALLOCATION_BUCKET_COUNT (12)
 #define ALLOCATION_BUCKET_OFFSET (2)
@@ -38,8 +38,8 @@ void stats_init(void) {
 // Thread to print out statistics every 5 seconds
 void print_thread(void){
     fprintf(stderr, "\n\n\nOverall stats:\n");
-    fprintf(stderr, "%lu Overall allocations since start\n", memstats.num_allocations);
-    fprintf(stderr, "%lub Current total allocated size\n", memstats.current_allocated_size);
+    fprintf(stderr, "%llu Overall allocations since start\n", memstats.num_allocations);
+    fprintf(stderr, "%llub Current total allocated size\n", memstats.current_allocated_size);
     fprintf(stderr, "\n");
     fprintf(stderr, "Current allocations by size:\n");
 
@@ -47,15 +47,15 @@ void print_thread(void){
     for(int i = ALLOCATION_BUCKET_OFFSET; i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET; i++) {
         // special case the first bucket to print with '<'
         if(i == ALLOCATION_BUCKET_OFFSET) {
-            fprintf(stderr, "<%d bytes: %lu\n", (1<<i), memstats.allocation_buckets[i]);
+            fprintf(stderr, "<%d bytes: %llu\n", (1<<i), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
         }
         // typical case
         else if (i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET-1){
-            fprintf(stderr, "%d-%d bytes: %lu\n", (1<<(i-1)), (1<<i), memstats.allocation_buckets[i]);
+            fprintf(stderr, "%d-%d bytes: %llu\n", (1<<(i-1)), (1<<i), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
         }
         // special case the first bucket to print with '>'
         else {
-            fprintf(stderr, ">%d bytes: %lu\n", (1<<(i-1)), memstats.allocation_buckets[i]);
+            fprintf(stderr, ">%d bytes: %llu\n", (1<<(i-1)), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
         }
     }
 
@@ -83,13 +83,13 @@ void print_thread(void){
                     memstats.time_buckets[i]++;
                     break;
                 }
-            }   
+            }
         }
         // Print out numbers
         for(int i = 0; i < TIME_BUCKET_COUNT; i++) {
-            fprintf(stderr, "<%d seconds: %ld\n", (int)pow(10,i), memstats.time_buckets[i]);
-        }   
-    }    
+            fprintf(stderr, "<%d seconds: %llu\n", (int)pow(10,i), memstats.time_buckets[i]);
+        }
+    }
 
      fprintf(stderr, "\n\n");
 }
@@ -102,44 +102,33 @@ static void remove_mem_info(void *ptr) {
         return;
     }
     mem_info_t *alias = head;
-    if(head->ptr == ptr) {
-        // update memstats 
-        memstats.num_allocations--;
-        memstats.current_allocated_size-=head->size_allocated;
-        for(int i = ALLOCATION_BUCKET_OFFSET; i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET; i++) {
-            if(head->size_allocated < (1 << i)) {
-                memstats.allocation_buckets[i]--;
-                break;
-            }
-        }
-        free(head);
-        head = NULL;
-    } else {
-        while(alias->next != NULL) {
-            // clear out memory once ptr is found
-            mem_info_t *prior = alias;
-            alias = alias->next;
-            if(alias->ptr == ptr) {
-                // update memstats 
-                memstats.num_allocations--;
-                memstats.current_allocated_size-=head->size_allocated;
-                for(int i = ALLOCATION_BUCKET_OFFSET; i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET; i++) {
-                    if(head->size_allocated < (1 << i)) {
-                        memstats.allocation_buckets[i]--;
-                        break;
-                    }
-                }
-                prior->next = alias->next;
-                free(alias);
-            }
+    mem_info_t *prior = alias;
+
+    while(alias->next != NULL) {
+        prior = alias;
+        alias = alias->next;
+
+        if(alias->ptr == ptr) {
+            break;
         }
     }
-    
-    return;
+    // update memstats
+    memstats.num_allocations--;
+    memstats.current_allocated_size-=head->size_allocated;
+    for(int i = ALLOCATION_BUCKET_OFFSET; i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET; i++) {
+        if(head->size_allocated < (1 << i)) {
+            memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]--;
+            break;
+        }
+    }
+    prior->next = alias->next;
+    free(alias);
+    alias = NULL;
+    prior = NULL;
 }
 
 static void append_mem_info(void *ptr, size_t size) {
-    // ironically malloc space to store mem_info_t metadata 
+    // ironically malloc space to store mem_info_t metadata
     mem_info_t *new_info = (mem_info_t *)malloc(sizeof(mem_info_t));
 
     // populate new_info
@@ -161,12 +150,12 @@ static void append_mem_info(void *ptr, size_t size) {
         alias->next = new_info;
     }
 
-    // update memstats 
+    // update memstats
     memstats.num_allocations++;
     memstats.current_allocated_size+=size;
     for(int i = ALLOCATION_BUCKET_OFFSET; i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET; i++) {
         if(size < (1 << i)) {
-            memstats.allocation_buckets[i]++;
+            memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]++;
             break;
         }
     }
@@ -188,7 +177,7 @@ void *stats_malloc(size_t size) {
     if(ret != NULL){
         append_mem_info(ret, size);
     }
-    
+
     return ret;
 }
 
@@ -208,7 +197,7 @@ void *stats_realloc(void *ptr, size_t size) {
 // Call this instead of regular calloc for stats info
 void *stats_calloc(size_t nitems, size_t size) {
     printf("special calloc\r\n");
-    
+
     void * ret = (void *)calloc(nitems, size);
     // only update stats if calloc succeeds
     if(ret != NULL){
