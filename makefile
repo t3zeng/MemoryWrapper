@@ -15,13 +15,12 @@ default: debug # main
 # Compile without wrapper
 # main should use stdlib malloc, calloc, etc by default
 # override with
-main: main.c tests.c
-	$(CC) $(CFLAGS) -o test main.c tests.c
+main: main.c
+	$(CC) $(CFLAGS) -o main main.c
 
 # Compile with wrapper
 debug: main.c tests.c wrapper
-	# $(CC) $(CFLAGS) -o test main.c $(LDFLAGS) -lmemwrapper
-	$(CC) $(CFLAGS) -o test main.c tests.c ./libmemwrapper.so
+	$(CC) $(CFLAGS) -o main main.c tests.c ./libmemwrapper.so
 
 # Create shared lib
 #
@@ -38,4 +37,4 @@ mem_lib: mem_wrapper.c
 clean:
 	$(RM) mem_wrapper *.o *~
 	$(RM) libmemwrapper *.so *~
-	$(RM) test *.exe *~
+	$(RM) main *.exe *~

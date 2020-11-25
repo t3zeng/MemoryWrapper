@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "mem_wrapper.h"
 #include "tests.h"
 
 // Used to call test functions

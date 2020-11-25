@@ -36,6 +36,3 @@ void *calloc(size_t nitems, size_t size);
 
 // Call this instead of regular free for stats info
 void free(void *ptr);
-
-// used to print memory info
-void print_thread(void);

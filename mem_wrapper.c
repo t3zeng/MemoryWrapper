@@ -7,11 +7,15 @@
 #include <string.h>
 #include <math.h>
 #include <dlfcn.h>
+#include <pthread.h>
+#include <unistd.h>
 
 static void* (*real_malloc)(size_t)=NULL;
 static void* (*real_calloc)(size_t, size_t)=NULL;
 static void* (*real_realloc)(void *, size_t)=NULL;
 static void* (*real_free)(void *)=NULL;
+
+static void *print_thread(void *arg);
 
 static mem_stats_t memstats;
 static mem_info_t *head = NULL; // linked list so we can store as many of these as needed
@@ -40,6 +44,9 @@ static void stats_init(void) {
     if (NULL == real_malloc) {
         fprintf(stderr, "Free redefine failed with error: %s\n", dlerror());
     }
+
+    pthread_t tid;
+    pthread_create(&tid, NULL, &print_thread, NULL);
 
     is_lib_init = true;
 }
@@ -96,45 +103,47 @@ mem_stats_t get_mem_stats(void) {
 }
 
 // Thread to print out statistics every 5 seconds
-void print_thread(void){
-    if(!is_lib_init) {
-        stats_init();
+static void *print_thread(void *arg){
+    while(1) {
+        fprintf(stderr, "\n\n\nOverall stats:\n");
+        fprintf(stderr, "%llu Overall allocations since start\n", memstats.num_allocations);
+        fprintf(stderr, "%llub Current total allocated size\n", memstats.current_allocated_size);
+        fprintf(stderr, "\n");
+        fprintf(stderr, "Current allocations by size:\n");
+
+        // print out allocations by bucket
+        for(int i = ALLOCATION_BUCKET_OFFSET; i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET; i++) {
+            // special case the first bucket to print with '<'
+            if(i == ALLOCATION_BUCKET_OFFSET) {
+                fprintf(stderr, "<%d bytes: %llu\n", (1<<i), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
+            }
+            // typical case
+            else if (i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET-1){
+                fprintf(stderr, "%d-%d bytes: %llu\n", (1<<(i-1)), (1<<i), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
+            }
+            // special case the last bucket to print with '>'
+            else {
+                fprintf(stderr, ">=%d bytes: %llu\n", (1<<(i-1)), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
+            }
+        }
+
+        // time must be generated on the spot to be accurate
+        // iterate through linked list to get the correct time buckets
+        fprintf(stderr, "\nCurrent Allocations by Age\n");
+
+        // Print out numbers
+        populate_time_buckets();
+        for(int i = 0; i < TIME_BUCKET_COUNT-1; i++) {
+            fprintf(stderr, "<%d seconds: %llu\n", (int)pow(10,i), memstats.time_buckets[i]);
+        }
+        fprintf(stderr, ">=%d seconds: %llu\n", (int)pow(10,TIME_BUCKET_COUNT-2), memstats.time_buckets[TIME_BUCKET_COUNT-1]);
+
+        fprintf(stderr, "\n\n");
+
+        sleep(5);
     }
 
-    fprintf(stderr, "\n\n\nOverall stats:\n");
-    fprintf(stderr, "%llu Overall allocations since start\n", memstats.num_allocations);
-    fprintf(stderr, "%llub Current total allocated size\n", memstats.current_allocated_size);
-    fprintf(stderr, "\n");
-    fprintf(stderr, "Current allocations by size:\n");
-
-    // print out allocations by bucket
-    for(int i = ALLOCATION_BUCKET_OFFSET; i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET; i++) {
-        // special case the first bucket to print with '<'
-        if(i == ALLOCATION_BUCKET_OFFSET) {
-            fprintf(stderr, "<%d bytes: %llu\n", (1<<i), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
-        }
-        // typical case
-        else if (i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET-1){
-            fprintf(stderr, "%d-%d bytes: %llu\n", (1<<(i-1)), (1<<i), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
-        }
-        // special case the last bucket to print with '>'
-        else {
-            fprintf(stderr, ">=%d bytes: %llu\n", (1<<(i-1)), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
-        }
-    }
-
-    // time must be generated on the spot to be accurate
-    // iterate through linked list to get the correct time buckets
-    fprintf(stderr, "\nCurrent Allocations by Age\n");
-
-    // Print out numbers
-    populate_time_buckets();
-    for(int i = 0; i < TIME_BUCKET_COUNT-1; i++) {
-        fprintf(stderr, "<%d seconds: %llu\n", (int)pow(10,i), memstats.time_buckets[i]);
-    }
-    fprintf(stderr, ">=%d seconds: %llu\n", (int)pow(10,TIME_BUCKET_COUNT-2), memstats.time_buckets[TIME_BUCKET_COUNT-1]);
-
-    fprintf(stderr, "\n\n");
+    return NULL;
 }
 
 static void remove_mem_info(void *ptr) {
