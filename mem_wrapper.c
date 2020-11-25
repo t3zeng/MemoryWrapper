@@ -27,21 +27,30 @@ static void populate_time_buckets(void) {
 
     mem_info_t *alias = head;
     // add time data to correct bucket
-    for(int i = 0; i < TIME_BUCKET_COUNT; i++) {
-        if((int)difftime(current_time, alias->time_allocated) < pow(10,i)) {
-            memstats.time_buckets[i]++;
-            break;
+    if((int)difftime(current_time, alias->time_allocated) > pow(10,TIME_BUCKET_COUNT-2)) {
+        memstats.time_buckets[TIME_BUCKET_COUNT-1]++;
+    } else {
+        for(int i = 0; i < TIME_BUCKET_COUNT-1; i++) {
+            if((int)difftime(current_time, alias->time_allocated) < pow(10,i)) {
+                memstats.time_buckets[i]++;
+                break;
+            }
         }
     }
+
     while(alias->next != NULL) {
         // move on to next mem block
         alias = alias->next;
 
         // add time data to correct bucket
-        for(int i = 0; i < TIME_BUCKET_COUNT; i++) {
-            if((int)difftime(current_time, alias->time_allocated) < pow(10,i)) {
-                memstats.time_buckets[i]++;
-                break;
+        if((int)difftime(current_time, alias->time_allocated) > pow(10,TIME_BUCKET_COUNT-2)) {
+            memstats.time_buckets[TIME_BUCKET_COUNT-1]++;
+        } else {
+            for(int i = 0; i < TIME_BUCKET_COUNT-1; i++) {
+                if((int)difftime(current_time, alias->time_allocated) < pow(10,i)) {
+                    memstats.time_buckets[i]++;
+                    break;
+                }
             }
         }
     }
@@ -70,9 +79,9 @@ void print_thread(void){
         else if (i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET-1){
             fprintf(stderr, "%d-%d bytes: %llu\n", (1<<(i-1)), (1<<i), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
         }
-        // special case the first bucket to print with '>'
+        // special case the last bucket to print with '>'
         else {
-            fprintf(stderr, ">%d bytes: %llu\n", (1<<(i-1)), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
+            fprintf(stderr, ">=%d bytes: %llu\n", (1<<(i-1)), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
         }
     }
 
@@ -82,9 +91,10 @@ void print_thread(void){
 
     // Print out numbers
     populate_time_buckets();
-    for(int i = 0; i < TIME_BUCKET_COUNT; i++) {
+    for(int i = 0; i < TIME_BUCKET_COUNT-1; i++) {
         fprintf(stderr, "<%d seconds: %llu\n", (int)pow(10,i), memstats.time_buckets[i]);
     }
+    fprintf(stderr, ">=%d seconds: %llu\n", (int)pow(10,TIME_BUCKET_COUNT-2), memstats.time_buckets[TIME_BUCKET_COUNT-1]);
 
      fprintf(stderr, "\n\n");
 }
@@ -99,12 +109,14 @@ static void remove_mem_info(void *ptr) {
     mem_info_t *alias = head;
     mem_info_t *prior = alias;
 
-    while(alias->next != NULL) {
-        prior = alias;
-        alias = alias->next;
+    if(alias->ptr != ptr) {
+        while(alias->next != NULL) {
+            prior = alias;
+            alias = alias->next;
 
-        if(alias->ptr == ptr) {
-            break;
+            if(alias->ptr == ptr) {
+                break;
+            }
         }
     }
     // update memstats
@@ -121,7 +133,7 @@ static void remove_mem_info(void *ptr) {
     free(alias);
 
     if(alias == head) {
-        head = NULL;
+        head = head->next;
     }
     alias = NULL;
     prior = NULL;
@@ -153,10 +165,16 @@ static void append_mem_info(void *ptr, size_t size) {
     // update memstats
     memstats.num_allocations++;
     memstats.current_allocated_size+=size;
-    for(int i = ALLOCATION_BUCKET_OFFSET; i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET; i++) {
-        if(size < (1 << i)) {
-            memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]++;
-            break;
+
+    // Either the size is greater than 4096 bytes and belongs in the last bucket or a bucket needs to be found
+    if(size >= (1 << ALLOCATION_BUCKET_COUNT)) {
+        memstats.allocation_buckets[ALLOCATION_BUCKET_COUNT-1]++;
+    } else {
+        for(int i = ALLOCATION_BUCKET_OFFSET; i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET-1; i++) {
+            if(size < (1 << i)) {
+                memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]++;
+                break;
+            }
         }
     }
 }
