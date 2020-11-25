@@ -1,14 +1,9 @@
 #define _GNU_SOURCE
 
-#include "mem_wrapper.h"
-#include <stdio.h>
-#include <stdint.h>
-#include <time.h>
-#include <string.h>
-#include <math.h>
 #include <dlfcn.h>
-#include <pthread.h>
-#include <unistd.h>
+#include <math.h>
+
+#include "mem_wrapper.h"
 
 static void* (*real_malloc)(size_t)=NULL;
 static void* (*real_calloc)(size_t, size_t)=NULL;

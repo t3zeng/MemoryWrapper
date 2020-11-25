@@ -7,7 +7,7 @@
 #  -fpic compile as position independent code (since it's a lib)
 CC = gcc
 CFLAGS = -g -Wall
-CFLAGS_LIB_COMPILE = -Wall -fPIC
+CFLAGS_LIB_COMPILE = -c -Wall -Werror -fpic
 LDFLAGS = -shared
 
 default: debug # main
@@ -24,13 +24,13 @@ debug: main.c tests.c wrapper
 
 # Create shared lib
 #
-wrapper: mem_wrapper.o
+wrapper: mem_wrapper.o mem_lib
 	$(CC) $(LDFLAGS) -o libmemwrapper.so mem_wrapper.o
 
 # Compile memlib
 #
 mem_lib: mem_wrapper.c
-	$(CC) $(CFLAGS_LIB_COMPILE) -o mem_wrapper.o mem_wrapper.c
+	$(CC) $(CFLAGS_LIB_COMPILE) mem_wrapper.c
 
 # Cleans up files we generate
 #

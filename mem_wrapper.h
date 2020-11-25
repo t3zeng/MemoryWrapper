@@ -1,6 +1,15 @@
 #pragma once
 
 #include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <time.h>
+#include <string.h>
+#include <math.h>
+#include <dlfcn.h>
+#include <pthread.h>
+#include <unistd.h>
 
 #define ALLOCATION_BUCKET_COUNT (12)
 #define ALLOCATION_BUCKET_OFFSET (2)
