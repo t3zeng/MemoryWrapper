@@ -1,17 +1,43 @@
+#define _GNU_SOURCE
+
 #include "mem_wrapper.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <time.h>
 #include <string.h>
 #include <math.h>
+#include <dlfcn.h>
 
+static void* (*real_malloc)(size_t)=NULL;
+static void* (*real_calloc)(size_t, size_t)=NULL;
+static void* (*real_realloc)(void *, size_t)=NULL;
+static void* (*real_free)(void *)=NULL;
 
 static mem_stats_t memstats;
-
 static mem_info_t *head = NULL; // linked list so we can store as many of these as needed
 
 void stats_init(void) {
     memset(&memstats, 0, sizeof(mem_stats_t));
+
+    real_malloc = dlsym(RTLD_NEXT, "malloc");
+    if (NULL == real_malloc) {
+        fprintf(stderr, "Malloc redefine failed with error: %s\n", dlerror());
+    }
+
+    real_calloc = dlsym(RTLD_NEXT, "calloc");
+    if (NULL == real_malloc) {
+        fprintf(stderr, "Calloc redefine failed with error: %s\n", dlerror());
+    }
+
+    real_realloc = dlsym(RTLD_NEXT, "realloc");
+    if (NULL == real_malloc) {
+        fprintf(stderr, "Realloc redefine failed with error: %s\n", dlerror());
+    }
+
+    real_free = dlsym(RTLD_NEXT, "free");
+    if (NULL == real_malloc) {
+        fprintf(stderr, "Free redefine failed with error: %s\n", dlerror());
+    }
 }
 
 static void populate_time_buckets(void) {
@@ -130,7 +156,7 @@ static void remove_mem_info(void *ptr) {
     }
 
     prior->next = alias->next;
-    free(alias);
+    real_free(alias);
 
     if(alias == head) {
         head = head->next;
@@ -141,7 +167,7 @@ static void remove_mem_info(void *ptr) {
 
 static void append_mem_info(void *ptr, size_t size) {
     // ironically malloc space to store mem_info_t metadata
-    mem_info_t *new_info = (mem_info_t *)malloc(sizeof(mem_info_t));
+    mem_info_t *new_info = (mem_info_t *)real_malloc(sizeof(mem_info_t));
 
     // populate new_info
     new_info->ptr = ptr;
@@ -180,8 +206,8 @@ static void append_mem_info(void *ptr, size_t size) {
 }
 
 // Call this instead of regular malloc for stats info
-void *stats_malloc(size_t size) {
-    void * ret = (void *)malloc(size);
+void *malloc(size_t size) {
+    void * ret = (void *)real_malloc(size);
 
     // only update stats if malloc succeeds
     if(ret != NULL){
@@ -192,8 +218,8 @@ void *stats_malloc(size_t size) {
 }
 
 // Call this instead of regular realloc for stats info
-void *stats_realloc(void *ptr, size_t size) {
-    void * ret = (void *)realloc(ptr, size);
+void *realloc(void *ptr, size_t size) {
+    void * ret = (void *)real_realloc(ptr, size);
     // only update stats if realloc succeeds
     if(ret != NULL){
         remove_mem_info(ptr);
@@ -204,8 +230,8 @@ void *stats_realloc(void *ptr, size_t size) {
 }
 
 // Call this instead of regular calloc for stats info
-void *stats_calloc(size_t nitems, size_t size) {
-    void * ret = (void *)calloc(nitems, size);
+void *calloc(size_t nitems, size_t size) {
+    void * ret = (void *)real_calloc(nitems, size);
     // only update stats if calloc succeeds
     if(ret != NULL){
         append_mem_info(ret, nitems*size);
@@ -215,7 +241,7 @@ void *stats_calloc(size_t nitems, size_t size) {
 }
 
 // Call this instead of regular free for stats info
-void stats_free(void *ptr) {
+void free(void *ptr) {
     remove_mem_info(ptr);
-    free(ptr);
+    real_free(ptr);
 }

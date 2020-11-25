@@ -12,7 +12,7 @@ bool one_byte_malloc_test(void) {
 
     // allocate memory
     for(int i = 0; i < TEST_PTR_CNT; i++) {
-        test[i] = (uint8_t *)stats_malloc(sizeof(uint8_t));
+        test[i] = (uint8_t *)malloc(sizeof(uint8_t));
     }
 
     // check stats are as expected
@@ -67,7 +67,7 @@ bool one_byte_malloc_test(void) {
 
     // Free half the memory
     for(int i = 0; i < TEST_PTR_CNT/2; i++) {
-        stats_free(test[i]);
+        free(test[i]);
     }
 
     // check stats are as expected
@@ -95,7 +95,7 @@ bool one_byte_malloc_test(void) {
 
     // Free the rest of the memory
     for(int i = TEST_PTR_CNT/2; i < TEST_PTR_CNT; i++) {
-        stats_free(test[i]);
+        free(test[i]);
     }
 
     // check stats are as expected
@@ -134,7 +134,7 @@ bool multisize_malloc_test(void) {
     for(int j = 0; j < TEST_PTR_CNT; j++) {
         // allocate memory starting from 2 bytes to 4096
         for(int i = 1; i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET-1; i++) {
-            test[i][j] = (uint8_t *)stats_malloc(sizeof(uint8_t)*(1 << (i)));
+            test[i][j] = (uint8_t *)malloc(sizeof(uint8_t)*(1 << (i)));
             expected_size += sizeof(uint8_t)*(1 << (i));
         }
         // check stats are as expected each time
@@ -162,7 +162,7 @@ bool multisize_malloc_test(void) {
     for(int j = 0; j < TEST_PTR_CNT; j++) {
         // allocate memory starting from 2 bytes to 4096
         for(int i = 1; i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET-1; i++) {
-            stats_free(test[i][j]);
+            free(test[i][j]);
             expected_size -= sizeof(uint8_t)*(1 << (i));
         }
         // check stats are as expected each time

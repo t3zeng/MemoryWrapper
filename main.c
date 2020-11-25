@@ -6,6 +6,8 @@
 
 // Used to call test functions
 int main(void) {
+    stats_init();
+
     if(!one_byte_malloc_test()) {
         printf("Test failed\n");
     }
