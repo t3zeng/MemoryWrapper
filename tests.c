@@ -122,6 +122,10 @@ bool one_byte_malloc_test(void) {
     return true;
 }
 
+/*
+* Deliberately allocates blocks of memory that populate all the different buckets
+* The memory is freed as well to ensure that it also works as expected.
+*/
 bool multisize_malloc_test(void) {
     // create a bunch of pointers to allocate
     uint8_t *test[ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET-1][TEST_PTR_CNT];
@@ -182,6 +186,87 @@ bool multisize_malloc_test(void) {
                 return false;
             }
         }
+    }
+
+    return true;
+}
+
+/*
+* Tests the time buckets by allocating memory and waiting
+*/
+bool calloc_realloc_time_bucket_test(void) {
+    // create a bunch of pointers to allocate
+    uint8_t *test[TEST_PTR_CNT];
+    mem_stats_t results;
+    uint64_t expected_size = 0;
+
+    // allocate odd amount of memory with calloc
+    for(int i = 0; i < TEST_PTR_CNT; i++) {
+        test[i] = (uint8_t *)calloc(3, sizeof(uint8_t));
+        expected_size += 3*sizeof(uint8_t);
+    }
+
+    // check stats are as expected each time
+    results = get_mem_stats();
+
+    // Correct number of allocations are made
+    if(results.num_allocations != TEST_PTR_CNT) {
+        return false;
+    }
+
+    // Allocated size is as expected
+    if(results.current_allocated_size != expected_size) {
+        return false;
+    }
+
+    // Memory bucket count is as expected
+    if(results.allocation_buckets[0] != TEST_PTR_CNT) {
+        return false;
+    }
+    for(int i = 1; i < ALLOCATION_BUCKET_COUNT; i++) {
+        if(results.allocation_buckets[i] != 0) {
+            return false;
+        }
+    }
+
+    // reallocate the previously calloced memory with realloc (make it 1 byte bigger to observe bucket change)
+    for(int i = 0; i < TEST_PTR_CNT; i++) {
+        test[i] = (uint8_t *)realloc(test[i], 4*sizeof(uint8_t));
+        expected_size += sizeof(uint8_t);
+    }
+
+    for(int j = 0; j < TIME_BUCKET_COUNT; j++) {
+        // check stats are as expected each time
+        results = get_mem_stats();
+
+        // Correct number of allocations are made
+        if(results.num_allocations != TEST_PTR_CNT) {
+            return false;
+        }
+
+        // Allocated size is as expected
+        if(results.current_allocated_size != expected_size) {
+            return false;
+        }
+
+        // Memory bucket count is as expected
+        if(results.allocation_buckets[1] != TEST_PTR_CNT) {
+            return false;
+        }
+        for(int i = 0; i < ALLOCATION_BUCKET_COUNT; i++) {
+            if(i != 1) {
+                if(results.allocation_buckets[i] != 0) {
+                    return false;
+                }
+            }
+        }
+
+        // Time bucket count is as expected
+        if(results.time_buckets[j] != TEST_PTR_CNT) {
+            return false;
+        }
+
+        sleep(pow(10,j));
     }
 
     return true;

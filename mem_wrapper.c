@@ -251,7 +251,9 @@ void *realloc(void *ptr, size_t size) {
     void * ret = (void *)real_realloc(ptr, size);
     // only update stats if realloc succeeds
     if(ret != NULL){
-        remove_mem_info(ptr);
+        if(ptr != NULL){
+            remove_mem_info(ptr);
+        }
         append_mem_info(ret, size);
     }
 
