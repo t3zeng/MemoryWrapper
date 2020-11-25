@@ -63,8 +63,6 @@ bool one_byte_malloc_test(void) {
         return false;
     }
 
-    results = get_mem_stats();
-
     // Free half the memory
     for(int i = 0; i < TEST_PTR_CNT/2; i++) {
         free(test[i]);

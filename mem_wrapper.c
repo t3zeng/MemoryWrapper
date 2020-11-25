@@ -16,7 +16,9 @@ static void* (*real_free)(void *)=NULL;
 static mem_stats_t memstats;
 static mem_info_t *head = NULL; // linked list so we can store as many of these as needed
 
-void stats_init(void) {
+static bool is_lib_init = false;
+
+static void stats_init(void) {
     memset(&memstats, 0, sizeof(mem_stats_t));
 
     real_malloc = dlsym(RTLD_NEXT, "malloc");
@@ -38,6 +40,8 @@ void stats_init(void) {
     if (NULL == real_malloc) {
         fprintf(stderr, "Free redefine failed with error: %s\n", dlerror());
     }
+
+    is_lib_init = true;
 }
 
 static void populate_time_buckets(void) {
@@ -83,12 +87,20 @@ static void populate_time_buckets(void) {
 }
 
 mem_stats_t get_mem_stats(void) {
+    if(!is_lib_init) {
+        stats_init();
+    }
+
     populate_time_buckets();
     return memstats;
 }
 
 // Thread to print out statistics every 5 seconds
 void print_thread(void){
+    if(!is_lib_init) {
+        stats_init();
+    }
+
     fprintf(stderr, "\n\n\nOverall stats:\n");
     fprintf(stderr, "%llu Overall allocations since start\n", memstats.num_allocations);
     fprintf(stderr, "%llub Current total allocated size\n", memstats.current_allocated_size);
@@ -122,7 +134,7 @@ void print_thread(void){
     }
     fprintf(stderr, ">=%d seconds: %llu\n", (int)pow(10,TIME_BUCKET_COUNT-2), memstats.time_buckets[TIME_BUCKET_COUNT-1]);
 
-     fprintf(stderr, "\n\n");
+    fprintf(stderr, "\n\n");
 }
 
 static void remove_mem_info(void *ptr) {
@@ -207,6 +219,10 @@ static void append_mem_info(void *ptr, size_t size) {
 
 // Call this instead of regular malloc for stats info
 void *malloc(size_t size) {
+    if(!is_lib_init) {
+        stats_init();
+    }
+
     void * ret = (void *)real_malloc(size);
 
     // only update stats if malloc succeeds
@@ -219,6 +235,10 @@ void *malloc(size_t size) {
 
 // Call this instead of regular realloc for stats info
 void *realloc(void *ptr, size_t size) {
+    if(!is_lib_init) {
+        stats_init();
+    }
+
     void * ret = (void *)real_realloc(ptr, size);
     // only update stats if realloc succeeds
     if(ret != NULL){
@@ -231,6 +251,10 @@ void *realloc(void *ptr, size_t size) {
 
 // Call this instead of regular calloc for stats info
 void *calloc(size_t nitems, size_t size) {
+    if(!is_lib_init) {
+        stats_init();
+    }
+
     void * ret = (void *)real_calloc(nitems, size);
     // only update stats if calloc succeeds
     if(ret != NULL){
@@ -242,6 +266,10 @@ void *calloc(size_t nitems, size_t size) {
 
 // Call this instead of regular free for stats info
 void free(void *ptr) {
+    if(!is_lib_init) {
+        stats_init();
+    }
+
     remove_mem_info(ptr);
     real_free(ptr);
 }

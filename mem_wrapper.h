@@ -22,9 +22,6 @@ typedef struct mem_info {
     struct mem_info *next;
 } mem_info_t;
 
-// Sets up memory wrapping
-void stats_init(void);
-
 // Returns the mem_stats
 mem_stats_t get_mem_stats(void);
 
