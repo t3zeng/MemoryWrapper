@@ -31,22 +31,22 @@ static void stats_init(void) {
     }
 
     real_calloc = dlsym(RTLD_NEXT, "calloc");
-    if (NULL == real_malloc) {
+    if (NULL == real_calloc) {
         fprintf(stderr, "Calloc redefine failed with error: %s\n", dlerror());
     }
 
     real_realloc = dlsym(RTLD_NEXT, "realloc");
-    if (NULL == real_malloc) {
+    if (NULL == real_realloc) {
         fprintf(stderr, "Realloc redefine failed with error: %s\n", dlerror());
     }
 
     real_free = dlsym(RTLD_NEXT, "free");
-    if (NULL == real_malloc) {
+    if (NULL == real_free) {
         fprintf(stderr, "Free redefine failed with error: %s\n", dlerror());
     }
 
-    pthread_t tid;
-    pthread_create(&tid, NULL, &print_thread, NULL);
+    pthread_t print_thread_handle;
+    pthread_create(&print_thread_handle, NULL, &print_thread, NULL);
 
     is_lib_init = true;
 }
