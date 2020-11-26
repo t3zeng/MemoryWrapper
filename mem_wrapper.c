@@ -2,10 +2,10 @@
 
 #include "mem_wrapper.h"
 
-static void* (*real_malloc)(size_t)=NULL;
-static void* (*real_calloc)(size_t, size_t)=NULL;
-static void* (*real_realloc)(void *, size_t)=NULL;
-static void* (*real_free)(void *)=NULL;
+static void* (*real_malloc)(size_t size)=NULL;
+static void* (*real_calloc)(size_t nitems, size_t size)=NULL;
+static void* (*real_realloc)(void *ptr, size_t size)=NULL;
+static void* (*real_free)(void *ptr)=NULL;
 
 static void *print_thread(void *arg);
 
