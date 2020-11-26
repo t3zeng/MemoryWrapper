@@ -1,10 +1,6 @@
 #pragma once
 
 #include <stdbool.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <unistd.h>
-#include <math.h>
 
 #define TEST_PTR_CNT (50)
 

@@ -1,8 +1,5 @@
 #define _GNU_SOURCE
 
-#include <dlfcn.h>
-#include <math.h>
-
 #include "mem_wrapper.h"
 
 static void* (*real_malloc)(size_t)=NULL;
@@ -101,8 +98,8 @@ mem_stats_t get_mem_stats(void) {
 static void *print_thread(void *arg){
     while(1) {
         fprintf(stderr, "\n\n\nOverall stats:\n");
-        fprintf(stderr, "%llu Overall allocations since start\n", memstats.num_allocations);
-        fprintf(stderr, "%llub Current total allocated size\n", memstats.current_allocated_size);
+        fprintf(stderr, "%lu Overall allocations since start\n", memstats.num_allocations);
+        fprintf(stderr, "%lub Current total allocated size\n", memstats.current_allocated_size);
         fprintf(stderr, "\n");
         fprintf(stderr, "Current allocations by size:\n");
 
@@ -110,15 +107,15 @@ static void *print_thread(void *arg){
         for(int i = ALLOCATION_BUCKET_OFFSET; i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET; i++) {
             // special case the first bucket to print with '<'
             if(i == ALLOCATION_BUCKET_OFFSET) {
-                fprintf(stderr, "<%d bytes: %llu\n", (1<<i), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
+                fprintf(stderr, "<%d bytes: %lu\n", (1<<i), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
             }
             // typical case
             else if (i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET-1){
-                fprintf(stderr, "%d-%d bytes: %llu\n", (1<<(i-1)), (1<<i), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
+                fprintf(stderr, "%d-%d bytes: %lu\n", (1<<(i-1)), (1<<i), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
             }
             // special case the last bucket to print with '>'
             else {
-                fprintf(stderr, ">=%d bytes: %llu\n", (1<<(i-1)), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
+                fprintf(stderr, ">=%d bytes: %lu\n", (1<<(i-1)), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
             }
         }
 
@@ -129,9 +126,9 @@ static void *print_thread(void *arg){
         // Print out numbers
         populate_time_buckets();
         for(int i = 0; i < TIME_BUCKET_COUNT-1; i++) {
-            fprintf(stderr, "<%d seconds: %llu\n", (int)pow(10,i), memstats.time_buckets[i]);
+            fprintf(stderr, "<%d seconds: %lu\n", (int)pow(10,i), memstats.time_buckets[i]);
         }
-        fprintf(stderr, ">=%d seconds: %llu\n", (int)pow(10,TIME_BUCKET_COUNT-2), memstats.time_buckets[TIME_BUCKET_COUNT-1]);
+        fprintf(stderr, ">=%d seconds: %lu\n", (int)pow(10,TIME_BUCKET_COUNT-2), memstats.time_buckets[TIME_BUCKET_COUNT-1]);
 
         fprintf(stderr, "\n\n");
 

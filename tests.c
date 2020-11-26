@@ -1,5 +1,5 @@
-#include "mem_wrapper.h"
 #include "tests.h"
+#include "mem_wrapper.h"
 
 /*
 * Tests malloc by allocating a high number of 1 byte blocks of memory
@@ -162,7 +162,6 @@ bool multisize_malloc_test(void) {
 
     // sweep through again, this time freeing memory
     for(int j = 0; j < TEST_PTR_CNT; j++) {
-        // allocate memory starting from 2 bytes to 4096
         for(int i = 1; i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET-1; i++) {
             free(test[i][j]);
             expected_size -= sizeof(uint8_t)*(1 << (i));
@@ -267,6 +266,30 @@ bool calloc_realloc_time_bucket_test(void) {
         }
 
         sleep(pow(10,j));
+    }
+
+    // sweep through again, this time freeing memory
+    for(int i = 0; i < TEST_PTR_CNT; i++) {
+        free(test[i]);
+        expected_size -= 4*sizeof(uint8_t);
+
+        // check stats are as expected each time
+        results = get_mem_stats();
+
+        // Correct number of allocations are made
+        if(results.num_allocations != TEST_PTR_CNT-(i+1)) {
+            return false;
+        }
+
+        // Allocated size is as expected
+        if(results.current_allocated_size != expected_size) {
+            return false;
+        }
+
+        // Memory bucket count is as expected
+        if(results.allocation_buckets[1] != TEST_PTR_CNT-(i+1)) {
+            return false;
+        }
     }
 
     return true;

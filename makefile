@@ -7,10 +7,11 @@
 #  -fpic compile as position independent code (since it's a lib)
 CC = gcc
 CFLAGS = -g -Wall
-CFLAGS_LIB_COMPILE = -c -Wall -Werror -fpic
+CFLAGS_LIB_COMPILE = -c -Wall -fpic
 LDFLAGS = -shared
+LIBFLAGS = -lm -lpthread -ldl
 
-default: debug # main
+default: debug # run this by default so I can develop without needing LD_PRELOAD
 
 # Compile without wrapper
 # main should use stdlib malloc, calloc, etc by default
@@ -20,7 +21,7 @@ main: main.c
 
 # Compile with wrapper
 debug: main.c tests.c wrapper
-	$(CC) $(CFLAGS) -o main main.c tests.c ./libmemwrapper.so
+	$(CC) $(CFLAGS) -o main main.c tests.c ./libmemwrapper.so $(LIBFLAGS)
 
 # Create shared lib
 #
