@@ -20,6 +20,7 @@ int main(void) {
     //
     // printf("Tests complete\n");
 
+    printf("Proof of Concept\n");
     int * poc = (int *)malloc(sizeof(int));
     *poc = 1;
     sleep(15);

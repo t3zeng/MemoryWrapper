@@ -28,11 +28,6 @@ debug: main.c tests.c wrapper
 wrapper: mem_wrapper.o mem_lib
 	$(CC) $(LDFLAGS) -o libmemwrapper.so mem_wrapper.o
 
-# Create shared lib for mac
-#
-mac_wrapper: mem_wrapper.o mem_lib
-	$(CC) $(LDFLAGS) -o libmemwrapper.dylib mem_wrapper.o
-
 # Compile memlib
 #
 mem_lib: mem_wrapper.c

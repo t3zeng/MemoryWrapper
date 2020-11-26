@@ -14,6 +14,11 @@ static mem_info_t *head = NULL; // linked list so we can store as many of these 
 
 static bool is_lib_init = false;
 
+static __thread bool malloc_hook = true;
+static __thread bool calloc_hook = true;
+static __thread bool realloc_hook = true;
+static __thread bool free_hook = true;
+
 static void stats_init(void) {
     memset(&memstats, 0, sizeof(mem_stats_t));
 
@@ -97,9 +102,14 @@ mem_stats_t get_mem_stats(void) {
 // Thread to print out statistics every 5 seconds
 static void *print_thread(void *arg){
     while(1) {
+        malloc_hook = false;
+        calloc_hook = false;
+        realloc_hook = false;
+        free_hook = false;
+
         fprintf(stderr, "\n\n\nOverall stats:\n");
-        fprintf(stderr, "%lu Overall allocations since start\n", memstats.num_allocations);
-        fprintf(stderr, "%lub Current total allocated size\n", memstats.current_allocated_size);
+        fprintf(stderr, "%llu Overall allocations since start\n", memstats.num_allocations);
+        fprintf(stderr, "%llub Current total allocated size\n", memstats.current_allocated_size);
         fprintf(stderr, "\n");
         fprintf(stderr, "Current allocations by size:\n");
 
@@ -107,15 +117,15 @@ static void *print_thread(void *arg){
         for(int i = ALLOCATION_BUCKET_OFFSET; i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET; i++) {
             // special case the first bucket to print with '<'
             if(i == ALLOCATION_BUCKET_OFFSET) {
-                fprintf(stderr, "<%d bytes: %lu\n", (1<<i), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
+                fprintf(stderr, "<%d bytes: %llu\n", (1<<i), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
             }
             // typical case
             else if (i < ALLOCATION_BUCKET_COUNT+ALLOCATION_BUCKET_OFFSET-1){
-                fprintf(stderr, "%d-%d bytes: %lu\n", (1<<(i-1)), (1<<i), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
+                fprintf(stderr, "%d-%d bytes: %llu\n", (1<<(i-1)), (1<<i), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
             }
             // special case the last bucket to print with '>'
             else {
-                fprintf(stderr, ">=%d bytes: %lu\n", (1<<(i-1)), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
+                fprintf(stderr, ">=%d bytes: %llu\n", (1<<(i-1)), memstats.allocation_buckets[i-ALLOCATION_BUCKET_OFFSET]);
             }
         }
 
@@ -126,11 +136,16 @@ static void *print_thread(void *arg){
         // Print out numbers
         populate_time_buckets();
         for(int i = 0; i < TIME_BUCKET_COUNT-1; i++) {
-            fprintf(stderr, "<%d seconds: %lu\n", (int)pow(10,i), memstats.time_buckets[i]);
+            fprintf(stderr, "<%d seconds: %llu\n", (int)pow(10,i), memstats.time_buckets[i]);
         }
-        fprintf(stderr, ">=%d seconds: %lu\n", (int)pow(10,TIME_BUCKET_COUNT-2), memstats.time_buckets[TIME_BUCKET_COUNT-1]);
+        fprintf(stderr, ">=%d seconds: %llu\n", (int)pow(10,TIME_BUCKET_COUNT-2), memstats.time_buckets[TIME_BUCKET_COUNT-1]);
 
         fprintf(stderr, "\n\n");
+
+        malloc_hook = true;
+        calloc_hook = true;
+        realloc_hook = true;
+        free_hook = true;
 
         sleep(5);
     }
@@ -139,10 +154,20 @@ static void *print_thread(void *arg){
 }
 
 static void remove_mem_info(void *ptr) {
+    malloc_hook = false;
+    calloc_hook = false;
+    realloc_hook = false;
+    free_hook = false;
+
     // Look for ptr in linked list and remove
     if(head == NULL) {
         // should never get here if we get passed a valid ptr
         fprintf(stderr, "ERROR\n");
+
+        malloc_hook = true;
+        calloc_hook = true;
+        realloc_hook = true;
+        free_hook = true;
         return;
     }
     mem_info_t *alias = head;
@@ -176,9 +201,19 @@ static void remove_mem_info(void *ptr) {
     }
     alias = NULL;
     prior = NULL;
+
+    malloc_hook = true;
+    calloc_hook = true;
+    realloc_hook = true;
+    free_hook = true;
 }
 
 static void append_mem_info(void *ptr, size_t size) {
+    malloc_hook = false;
+    calloc_hook = false;
+    realloc_hook = false;
+    free_hook = false;
+
     // ironically malloc space to store mem_info_t metadata
     mem_info_t *new_info = (mem_info_t *)real_malloc(sizeof(mem_info_t));
 
@@ -216,6 +251,11 @@ static void append_mem_info(void *ptr, size_t size) {
             }
         }
     }
+
+    malloc_hook = true;
+    calloc_hook = true;
+    realloc_hook = true;
+    free_hook = true;
 }
 
 // Call this instead of regular malloc for stats info
@@ -225,6 +265,7 @@ void *malloc(size_t size) {
     }
 
     void * ret = (void *)real_malloc(size);
+    if(!malloc_hook) return ret;
 
     // only update stats if malloc succeeds
     if(ret != NULL){
@@ -241,6 +282,8 @@ void *realloc(void *ptr, size_t size) {
     }
 
     void * ret = (void *)real_realloc(ptr, size);
+    if(!realloc_hook) return ret;
+
     // only update stats if realloc succeeds
     if(ret != NULL){
         if(ptr != NULL){
@@ -259,6 +302,8 @@ void *calloc(size_t nitems, size_t size) {
     }
 
     void * ret = (void *)real_calloc(nitems, size);
+    if(!calloc_hook) return ret;
+
     // only update stats if calloc succeeds
     if(ret != NULL){
         append_mem_info(ret, nitems*size);
@@ -273,6 +318,6 @@ void free(void *ptr) {
         stats_init();
     }
 
-    remove_mem_info(ptr);
+    if(free_hook) remove_mem_info(ptr);
     real_free(ptr);
 }
